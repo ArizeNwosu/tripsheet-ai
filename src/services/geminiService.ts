@@ -116,7 +116,8 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
       ],
       config: {
         responseMimeType: "application/json",
-        responseSchema: TRIP_SCHEMA as any
+        responseSchema: TRIP_SCHEMA as any,
+        thinkingConfig: { thinkingBudget: 0 },
       }
     }),
     90_000,
@@ -150,7 +151,8 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
         ],
         config: {
           responseMimeType: "application/json",
-          responseSchema: TRIP_SCHEMA as any
+          responseSchema: TRIP_SCHEMA as any,
+          thinkingConfig: { thinkingBudget: 0 },
         }
       }),
       90_000,
@@ -217,7 +219,8 @@ export async function getAISuggestions(trip: Trip): Promise<AISuggestion[]> {
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: SUGGESTION_SCHEMA as any
+        responseSchema: SUGGESTION_SCHEMA as any,
+        thinkingConfig: { thinkingBudget: 0 },
       }
     }),
     60_000,
