@@ -111,38 +111,38 @@ export function UploadZone({
         </div>
       </div>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-sm border-b border-zinc-100 relative z-10">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-zinc-900 rounded flex items-center justify-center">
+      <div className="flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white/80 backdrop-blur-sm border-b border-zinc-100 relative z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-zinc-900 rounded flex items-center justify-center flex-shrink-0">
             <FileUp className="w-3.5 h-3.5 text-white" />
           </div>
           <span className="text-sm font-black tracking-widest text-zinc-900 uppercase">TripSheet AI</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 text-zinc-500 rounded-full uppercase tracking-wider">Beta</span>
+          <span className="hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 text-zinc-500 rounded-full uppercase tracking-wider">Beta</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={onOpenTemplate}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-white text-zinc-600 border border-zinc-200 hover:border-zinc-400 hover:text-zinc-900 transition-all"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-white text-zinc-600 border border-zinc-200 hover:border-zinc-400 hover:text-zinc-900 transition-all"
           >
             <Layers className="w-3 h-3" />
-            {templateLabel}
+            <span className="hidden sm:inline">{templateLabel}</span>
           </button>
           <button
             onClick={onOpenBranding}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-zinc-900 text-white hover:bg-zinc-700 transition-all"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-zinc-900 text-white hover:bg-zinc-700 transition-all"
           >
             <Settings className="w-3 h-3" />
-            Branding
+            <span className="hidden sm:inline">Branding</span>
           </button>
-          <div className="h-5 w-px bg-zinc-100" />
-          <span className="text-[11px] text-zinc-400 font-medium">
+          <div className="hidden sm:block h-5 w-px bg-zinc-100" />
+          <span className="hidden sm:inline text-[11px] text-zinc-400 font-medium truncate max-w-[120px]">
             {companyName}
           </span>
         </div>
       </div>
 
       {/* Main */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
         <AnimatePresence mode="wait">
           {isProcessing ? (
             /* ── Processing State ── */
@@ -292,7 +292,7 @@ export function UploadZone({
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 }}
-                  className="text-5xl font-black tracking-tighter text-zinc-900 leading-none mb-4"
+                  className="text-4xl sm:text-5xl font-black tracking-tighter text-zinc-900 leading-none mb-4"
                 >
                   Upload.<br />
                   <span className="text-zinc-300">Extract. Send.</span>
@@ -323,7 +323,7 @@ export function UploadZone({
                     See all
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {TEMPLATES.map(t => (
                     <button
                       key={t.id}
@@ -388,7 +388,7 @@ export function UploadZone({
                       <motion.div
                         key="drag-idle"
                         initial={{ scale: 1 }}
-                        className="border-2 border-dashed border-zinc-200 hover:border-zinc-400 bg-white/70 hover:bg-white rounded-2xl p-12 flex flex-col items-center justify-center gap-5 text-center transition-colors duration-200"
+                        className="border-2 border-dashed border-zinc-200 hover:border-zinc-400 bg-white/70 hover:bg-white rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center gap-4 sm:gap-5 text-center transition-colors duration-200"
                       >
                         <div className="w-14 h-14 bg-zinc-100 rounded-xl flex items-center justify-center">
                           <FileText className="w-7 h-7 text-zinc-400" />
@@ -432,7 +432,7 @@ export function UploadZone({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="mt-10 grid grid-cols-3 gap-3"
+                className="mt-8 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-3"
               >
                 {[
                   { stat: '< 10s', label: 'Processing time' },
@@ -451,7 +451,7 @@ export function UploadZone({
       </div>
 
       {/* Footer */}
-      <div className="px-8 py-3 bg-white/80 backdrop-blur-sm border-t border-zinc-100 text-center relative z-10">
+      <div className="px-4 sm:px-8 py-3 bg-white/80 backdrop-blur-sm border-t border-zinc-100 text-center relative z-10">
         <p className="text-[10px] text-zinc-300 uppercase tracking-widest font-bold">
           TripSheet AI · Private Aviation Broker Tools · Confidential
         </p>
