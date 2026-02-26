@@ -1,6 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 import { Trip, TRIP_SCHEMA, AISuggestion, SUGGESTION_SCHEMA } from "../types";
 
+const MODEL = "gemini-2.5-flash";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 function hasCriticalGaps(raw: any): boolean {
   if (!raw) return true;
   if (!raw.client?.name) return true;
@@ -73,55 +84,27 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
     Extract all trip details from the provided trip sheet document.
     
     Rules:
-    1. Identify all flight legs.
-    2. Extract airport codes (IATA/ICAO), cities, and times.
-    3. Extract aircraft model and tail number.
-    4. Extract passenger names if present.
-    5. Extract pricing details (subtotal, taxes, fees, total).
-    6. Extract terms and conditions.
-    7. If block time is missing but ETD/ETA are present, calculate it.
-    8. Normalize all data into the requested JSON structure.
-    9. Avoid empty strings in required fields. If you cannot read a value, infer it from context. If still unknown, use "TBD".
+    1. Extract the itinerary/trip/charter reference number exactly as printed on the document (it may be labelled "Itinerary #", "Trip #", "Charter #", "Ref #", "Booking #", or similar). Output it as trip_id. Preserve the original value character-for-character — do NOT invent or alter it.
+    2. Identify all flight legs.
+    3. Extract airport codes (IATA/ICAO), cities, and times.
+    4. Extract aircraft model and tail number.
+    5. Extract passenger names if present.
+    6. Extract pricing details (subtotal, taxes, fees, total).
+    7. Extract terms and conditions.
+    8. If block time is missing but ETD/ETA are present, calculate it.
+    9. Normalize all data into the requested JSON structure.
+    10. Avoid empty strings in required fields. If you cannot read a value, infer it from context. If still unknown, use "TBD".
     
     Return a valid JSON object matching the schema.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      {
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              data: fileData.split(",")[1],
-              mimeType: mimeType
-            }
-          }
-        ]
-      }
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: TRIP_SCHEMA as any
-    }
-  });
-
-  let rawData = JSON.parse(response.text || "{}");
-
-  if (hasCriticalGaps(rawData)) {
-    const repairPrompt = `
-      The extraction missed critical fields. Re-read the document and fill the missing values.
-      Use the existing JSON as a starting point. Do not leave required fields blank.
-      If truly unreadable, infer from context or use "TBD".
-    `;
-    const repairResponse = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: MODEL,
       contents: [
         {
           parts: [
-            { text: repairPrompt },
-            { text: `Existing JSON: ${JSON.stringify(rawData)}` },
+            { text: prompt },
             {
               inlineData: {
                 data: fileData.split(",")[1],
@@ -135,7 +118,44 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
         responseMimeType: "application/json",
         responseSchema: TRIP_SCHEMA as any
       }
-    });
+    }),
+    90_000,
+    "Trip extraction"
+  );
+
+  let rawData = JSON.parse(response.text || "{}");
+
+  if (hasCriticalGaps(rawData)) {
+    const repairPrompt = `
+      The extraction missed critical fields. Re-read the document and fill the missing values.
+      Use the existing JSON as a starting point. Do not leave required fields blank.
+      If truly unreadable, infer from context or use "TBD".
+    `;
+    const repairResponse = await withTimeout(
+      ai.models.generateContent({
+        model: MODEL,
+        contents: [
+          {
+            parts: [
+              { text: repairPrompt },
+              { text: `Existing JSON: ${JSON.stringify(rawData)}` },
+              {
+                inlineData: {
+                  data: fileData.split(",")[1],
+                  mimeType: mimeType
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: TRIP_SCHEMA as any
+        }
+      }),
+      90_000,
+      "Trip repair"
+    );
     rawData = JSON.parse(repairResponse.text || "{}");
   }
   
@@ -191,14 +211,18 @@ export async function getAISuggestions(trip: Trip): Promise<AISuggestion[]> {
     Return a list of structured suggestions. For each suggestion, provide a message, explanation, and if possible, a 'suggested_fix' with a 'field' path (e.g., 'legs.0.metrics.block_time_minutes') and the 'value' to set.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: SUGGESTION_SCHEMA as any
-    }
-  });
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: SUGGESTION_SCHEMA as any
+      }
+    }),
+    60_000,
+    "AI suggestions"
+  );
 
   return JSON.parse(response.text || "[]");
 }

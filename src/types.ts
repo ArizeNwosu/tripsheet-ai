@@ -90,6 +90,7 @@ export interface Trip {
 export const TRIP_SCHEMA = {
   type: Type.OBJECT,
   properties: {
+    trip_id: { type: Type.STRING },
     client: {
       type: Type.OBJECT,
       properties: {

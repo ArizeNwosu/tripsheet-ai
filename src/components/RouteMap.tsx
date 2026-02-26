@@ -174,7 +174,7 @@ export function RouteMap({ legs, height = 200, exportMode = false, mapStyle = 'l
 
   useEffect(() => {
     if (!containerRef.current) return;
-    if (!hasMap || exportMode || mapStyle === 'svg') return;
+    if (!hasMap || mapStyle === 'svg') return;
 
     // Clean up previous instance
     if (mapRef.current) {
@@ -267,14 +267,14 @@ export function RouteMap({ legs, height = 200, exportMode = false, mapStyle = 'l
 
   return (
     <div className="relative" style={{ height, width: '100%', zIndex: 0 }}>
-      {!exportMode && mapStyle === 'leaflet' && (
+      {hasMap && mapStyle !== 'svg' && (
         <div
           ref={containerRef}
           style={{ height, width: '100%' }}
           className="bg-zinc-50"
         />
       )}
-      {(exportMode || !hasMap || mapStyle === 'svg') && (
+      {(!hasMap || mapStyle === 'svg') && (
         <SimpleSvgMap legs={legs} height={height} />
       )}
     </div>

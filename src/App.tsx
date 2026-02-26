@@ -112,7 +112,8 @@ export default function App() {
         }
       } catch (error) {
         console.error('Extraction failed:', error);
-        addToast('error', 'Failed to extract trip data. Check your API key and try again.');
+        const msg = error instanceof Error ? error.message : String(error);
+        addToast('error', `Extraction failed: ${msg}`);
       } finally {
         const elapsed = Date.now() - uploadStart;
         const delay = Math.max(0, MIN_ANIM_MS - elapsed);
@@ -223,7 +224,13 @@ export default function App() {
         filter: (node) => {
           if (node instanceof HTMLImageElement) {
             const src = node.src ?? '';
-            return src.startsWith('data:') || src.startsWith(window.location.origin);
+            // Always allow data URIs and same-origin images
+            if (src.startsWith('data:') || src.startsWith(window.location.origin) || src.startsWith('/')) return true;
+            // Allow cross-origin images that opted in with crossOrigin="anonymous"
+            // (e.g. CartoDB/Leaflet map tiles — they have CORS headers)
+            if (node.crossOrigin === 'anonymous') return true;
+            // Block everything else (e.g. picsum placeholder aircraft photos — no CORS headers)
+            return false;
           }
           return true;
         },
