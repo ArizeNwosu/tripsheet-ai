@@ -142,7 +142,7 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
   // Add default visibility and IDs
   const withDefaults = {
     ...rawData,
-    trip_id: Math.random().toString(36).substr(2, 9),
+    trip_id: rawData.trip_id || Math.random().toString(36).substr(2, 9).toUpperCase(),
     legs: (rawData.legs || []).map((leg: any, index: number) => ({
       ...leg,
       leg_id: `leg-${index}`,

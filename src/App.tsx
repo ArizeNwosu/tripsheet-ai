@@ -54,6 +54,7 @@ export default function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>(loadTemplate);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('preview');
 
   // Persist broker profile to localStorage whenever it changes
   useEffect(() => {
@@ -356,33 +357,36 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden">
       {/* Header */}
-      <header className="h-12 border-b border-zinc-100 flex items-center justify-between px-5 bg-white z-40 flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="h-12 border-b border-zinc-100 flex items-center justify-between px-3 sm:px-5 bg-white z-40 flex-shrink-0">
+        {/* Left — back button + trip breadcrumb (collapses on mobile) */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => { setTrip(null); setSuggestions([]); }}
-            className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-400 hover:text-zinc-700"
+            className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-400 hover:text-zinc-700 flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div className="h-5 w-px bg-zinc-100" />
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-black tracking-widest text-zinc-900 uppercase">TripSheet</span>
-            <span className="text-zinc-200">·</span>
-            <span className="font-mono text-zinc-400 uppercase tracking-wide">{trip.trip_id}</span>
-            <span className="text-zinc-200">·</span>
-            <span className="text-zinc-600 font-medium">{trip.client.name}</span>
-            <span className="text-zinc-200">·</span>
-            <span className="text-zinc-400">{trip.aircraft.model}</span>
-            <span className="text-zinc-200">·</span>
-            <span className="text-zinc-400">{trip.legs.length} leg{trip.legs.length !== 1 ? 's' : ''}</span>
+          <div className="h-5 w-px bg-zinc-100 flex-shrink-0" />
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs min-w-0">
+            <span className="font-black tracking-widest text-zinc-900 uppercase flex-shrink-0">TripSheet</span>
+            <span className="text-zinc-200 flex-shrink-0">·</span>
+            <span className="font-mono text-zinc-400 uppercase tracking-wide flex-shrink-0">{trip.trip_id}</span>
+            {/* Hide client / aircraft / legs on small screens */}
+            <span className="hidden sm:inline text-zinc-200">·</span>
+            <span className="hidden sm:inline text-zinc-600 font-medium truncate max-w-[120px]">{trip.client.name}</span>
+            <span className="hidden md:inline text-zinc-200">·</span>
+            <span className="hidden md:inline text-zinc-400 truncate max-w-[140px]">{trip.aircraft.model}</span>
+            <span className="hidden md:inline text-zinc-200">·</span>
+            <span className="hidden md:inline text-zinc-400 flex-shrink-0">{trip.legs.length} leg{trip.legs.length !== 1 ? 's' : ''}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* AI suggestions */}
+        {/* Right — actions (secondary controls hidden on mobile) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          {/* AI suggestions — hidden on mobile */}
           <button
             onClick={() => setIsAssistantOpen(o => !o)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
               suggestions.length > 0
                 ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
                 : 'bg-zinc-50 text-zinc-500 border border-zinc-100 hover:bg-zinc-100'
@@ -392,18 +396,18 @@ export default function App() {
             AI{suggestions.length > 0 ? ` · ${suggestions.length}` : ''}
           </button>
 
-          <div className="h-4 w-px bg-zinc-100" />
+          <div className="hidden sm:block h-4 w-px bg-zinc-100" />
 
-          {/* Template picker */}
+          {/* Template picker — hidden on mobile */}
           <button
             onClick={() => setIsTemplatePickerOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-zinc-50 text-zinc-600 border border-zinc-100 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-zinc-50 text-zinc-600 border border-zinc-100 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
           >
             <Layers className="w-3 h-3" />
             {TEMPLATE_LABELS[selectedTemplate]}
           </button>
 
-          {/* Broker settings */}
+          {/* Broker settings — always visible */}
           <button
             onClick={() => setIsSettingsOpen(true)}
             title="Broker Settings"
@@ -414,24 +418,50 @@ export default function App() {
 
           <div className="h-4 w-px bg-zinc-100" />
 
-          {/* Export */}
+          {/* Export — always visible; label hidden on mobile */}
           <button
             onClick={downloadPDF}
             disabled={isGeneratingPDF}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-zinc-900 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-700 transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 bg-zinc-900 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-700 transition-all disabled:opacity-50"
           >
             {isGeneratingPDF ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-            Export PDF
+            <span className="hidden sm:inline">Export PDF</span>
           </button>
         </div>
       </header>
 
+      {/* Mobile tab toggle — shown only on small screens */}
+      <div className="sm:hidden flex border-b border-zinc-100 bg-white flex-shrink-0">
+        <button
+          onClick={() => setMobileTab('editor')}
+          className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+            mobileTab === 'editor'
+              ? 'text-zinc-900 border-b-2 border-zinc-900'
+              : 'text-zinc-400 hover:text-zinc-600'
+          }`}
+        >
+          Editor
+        </button>
+        <button
+          onClick={() => setMobileTab('preview')}
+          className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+            mobileTab === 'preview'
+              ? 'text-zinc-900 border-b-2 border-zinc-900'
+              : 'text-zinc-400 hover:text-zinc-600'
+          }`}
+        >
+          Preview
+        </button>
+      </div>
+
       {/* Main */}
       <main className="flex-1 flex overflow-hidden">
-        <div className="w-[420px] flex-shrink-0 border-r border-zinc-100">
+        {/* Editor panel — full width on mobile (tab-driven), fixed 420px on desktop */}
+        <div className={`${mobileTab === 'editor' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[420px] flex-shrink-0 sm:border-r border-zinc-100`}>
           <StructuredEditor trip={trip} setTrip={setTrip} />
         </div>
-        <div className="flex-1 min-w-0">
+        {/* Preview panel — full width on mobile (tab-driven), flex-1 on desktop */}
+        <div className={`${mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 min-w-0`}>
           <PreviewPanel trip={trip} brokerProfile={brokerProfile} templateId={selectedTemplate} exportMode={isExportingPDF} />
         </div>
       </main>
