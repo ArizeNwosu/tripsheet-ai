@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply font-sans text-zinc-900 bg-white;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  /* Native date/time inputs */
+  input[type="date"],
+  input[type="time"] {
+    @apply cursor-pointer;
+    color-scheme: light;
+  }
+
+  /* Remove number input arrows */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-zinc-200 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-zinc-300; }
+
+/* ── Jet Grid Animation ── */
+.jet-grid {
+  position: absolute;
+  inset: 0;
+}
+.jet {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  opacity: 0.6;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.08));
+}
+.jet-east {
+  animation: jet-east 12s linear infinite;
+}
+.jet-west {
+  animation: jet-west 13s linear infinite;
+}
+.jet-north {
+  animation: jet-north 14s linear infinite;
+}
+.jet-south {
+  animation: jet-south 12.5s linear infinite;
+}
+.jet-long.jet-east { animation-name: jet-east-long; }
+.jet-long.jet-west { animation-name: jet-west-long; }
+.jet-long.jet-north { animation-name: jet-north-long; }
+.jet-long.jet-south { animation-name: jet-south-long; }
+
+@keyframes jet-east {
+  0% { transform: translateX(0) rotate(0deg); opacity: 0.1; }
+  10% { opacity: 0.35; }
+  100% { transform: translateX(220px) rotate(0deg); opacity: 0.05; }
+}
+@keyframes jet-east-long {
+  0% { transform: translateX(-60px) rotate(0deg); opacity: 0; }
+  15% { opacity: 0.35; }
+  100% { transform: translateX(calc(100vw + 60px)) rotate(0deg); opacity: 0; }
+}
+@keyframes jet-west {
+  0% { transform: translateX(0) rotate(180deg) scaleY(-1); opacity: 0.1; }
+  10% { opacity: 0.35; }
+  100% { transform: translateX(-220px) rotate(180deg) scaleY(-1); opacity: 0.05; }
+}
+@keyframes jet-west-long {
+  0% { transform: translateX(60px) rotate(180deg) scaleY(-1); opacity: 0; }
+  15% { opacity: 0.35; }
+  100% { transform: translateX(calc(-100vw - 60px)) rotate(180deg) scaleY(-1); opacity: 0; }
+}
+@keyframes jet-north {
+  0% { transform: translateY(0) rotate(-90deg); opacity: 0.1; }
+  10% { opacity: 0.35; }
+  100% { transform: translateY(-220px) rotate(-90deg); opacity: 0.05; }
+}
+@keyframes jet-north-long {
+  0% { transform: translateY(60px) rotate(-90deg); opacity: 0; }
+  15% { opacity: 0.35; }
+  100% { transform: translateY(calc(-100vh - 60px)) rotate(-90deg); opacity: 0; }
+}
+@keyframes jet-south {
+  0% { transform: translateY(0) rotate(90deg); opacity: 0.1; }
+  10% { opacity: 0.35; }
+  100% { transform: translateY(220px) rotate(90deg); opacity: 0.05; }
+}
+@keyframes jet-south-long {
+  0% { transform: translateY(-60px) rotate(90deg); opacity: 0; }
+  15% { opacity: 0.35; }
+  100% { transform: translateY(calc(100vh + 60px)) rotate(90deg); opacity: 0; }
+}
+
+/* ── Leaflet z-index safety ── */
+.leaflet-container,
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 0 !important;
+}
+
+/* ── PDF preview — hide browser chrome for print ── */
+@media print {
+  body * { visibility: hidden; }
+  #pdf-content, #pdf-content * { visibility: visible; }
+  #pdf-content {
+    position: fixed;
+    top: 0; left: 0;
+    width: 210mm;
+    box-shadow: none !important;
+  }
+}
+
+/* ── Animated progress ring util ── */
+.ring-progress {
+  transform-origin: center;
+  transform: rotate(-90deg);
+}

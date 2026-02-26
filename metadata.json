@@ -1,0 +1,7 @@
+{
+  "name": "TripSheet AI",
+  "description": "Automated trip sheet extraction and branded PDF generation for charter brokers.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
