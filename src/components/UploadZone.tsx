@@ -337,14 +337,16 @@ export function UploadZone({
                       <div className="w-full bg-zinc-50" style={{ aspectRatio: '3/4' }}>
                         <TemplateThumb id={t.id} />
                       </div>
-                      <div className="px-3 py-2 bg-white border-t border-zinc-100">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-black text-zinc-900 uppercase tracking-wide">{t.name}</span>
-                          {selectedTemplate === t.id && (
-                            <span className="text-[9px] font-bold text-zinc-900 uppercase tracking-wider">Active</span>
-                          )}
+                      <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-white border-t border-zinc-100">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-[9px] sm:text-[11px] font-black text-zinc-900 uppercase tracking-wide truncate">{t.name}</span>
+                            {selectedTemplate === t.id && (
+                              <span className="flex-shrink-0 text-[7px] sm:text-[9px] font-bold text-zinc-900 uppercase tracking-wider">·Active</span>
+                            )}
+                          </div>
+                          <p className="hidden sm:block text-[10px] text-zinc-400 leading-tight">{t.description}</p>
                         </div>
-                        <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">{t.description}</p>
                       </div>
                     </button>
                   ))}
