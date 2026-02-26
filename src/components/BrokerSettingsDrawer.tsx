@@ -179,12 +179,8 @@ export function BrokerSettingsDrawer({ profile, isOpen, onClose, onChange }: Pro
               {/* Company info */}
               <div className="space-y-3">
                 <Label>Company Name</Label>
-                <input value={profile.company_name} onChange={e => set({ company_name: e.target.value })}
-                  placeholder="Your Company Name" className={inputCls} />
-
-                <Label>Tagline</Label>
                 <input value={profile.tagline || ''} onChange={e => set({ tagline: e.target.value })}
-                  placeholder="e.g. Private Charter · Est. 2008" className={inputCls} />
+                  placeholder="e.g. 24|7 Jet · Private Charter" className={inputCls} />
               </div>
 
               {/* Aircraft images */}

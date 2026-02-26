@@ -10,6 +10,7 @@ import { Trip, AISuggestion, BrokerProfile, DEFAULT_BROKER, TemplateId } from '.
 import { extractTripData, getAISuggestions } from './services/geminiService';
 import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Settings, Layers } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 export type ProcessingStage = 'reading' | 'extracting' | 'enriching' | null;
@@ -207,34 +208,65 @@ export default function App() {
     setIsGeneratingPDF(true);
     setIsExportingPDF(true);
     try {
-      // Wait for exportMode re-render (SVG map swap) to commit to the DOM
+      // Let the DOM settle
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
-      // html-to-image uses the browser's native SVG foreignObject renderer so it
-      // never needs to parse CSS itself — oklch, custom properties, Tailwind v4,
-      // all handled by the browser exactly as the user sees them on screen.
-      // The only thing we need to handle is cross-origin images (picsum fallback
-      // photos) which would taint the canvas; we exclude them via the filter fn.
+      // ── Step 1: Pre-capture each Leaflet map container ──────────────────────
+      // html-to-image can't reliably embed cross-origin tile images via its SVG
+      // foreignObject path. Instead we snapshot each .leaflet-container with
+      // html2canvas (which handles the complex Leaflet DOM / tile CORS correctly),
+      // swap the live map for the captured <img>, run html-to-image on the whole
+      // page, then restore the original containers.
+      type MapReplacement = { parent: HTMLElement; img: HTMLImageElement; original: HTMLElement };
+      const replacements: MapReplacement[] = [];
+
+      const leafletContainers = Array.from(
+        element.querySelectorAll<HTMLElement>('.leaflet-container')
+      );
+
+      for (const container of leafletContainers) {
+        try {
+          const mapCanvas = await html2canvas(container, {
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: null,
+            scale: 2,
+            logging: false,
+          });
+          const img = document.createElement('img');
+          img.src = mapCanvas.toDataURL('image/png');
+          img.style.width = container.offsetWidth + 'px';
+          img.style.height = container.offsetHeight + 'px';
+          img.style.display = 'block';
+          const parent = container.parentElement as HTMLElement;
+          parent.insertBefore(img, container);
+          parent.removeChild(container);
+          replacements.push({ parent, img, original: container });
+        } catch (e) {
+          console.warn('Map pre-capture failed, continuing without tiles:', e);
+        }
+      }
+
+      // ── Step 2: Capture full PDF with html-to-image ──────────────────────────
       const canvas = await toCanvas(element, {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
-        // Exclude <img> elements whose src isn't a data-URI or same-origin URL.
-        // These are the picsum.photos placeholder aircraft photos — they have no
-        // CORS headers so they'd taint the canvas and break toDataURL().
         filter: (node) => {
           if (node instanceof HTMLImageElement) {
             const src = node.src ?? '';
-            // Always allow data URIs and same-origin images
             if (src.startsWith('data:') || src.startsWith(window.location.origin) || src.startsWith('/')) return true;
-            // Allow cross-origin images that opted in with crossOrigin="anonymous"
-            // (e.g. CartoDB/Leaflet map tiles — they have CORS headers)
             if (node.crossOrigin === 'anonymous') return true;
-            // Block everything else (e.g. picsum placeholder aircraft photos — no CORS headers)
             return false;
           }
           return true;
         },
       });
+
+      // ── Step 3: Restore Leaflet containers ───────────────────────────────────
+      for (const { parent, img, original } of replacements) {
+        parent.insertBefore(original, img);
+        parent.removeChild(img);
+      }
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
