@@ -9,7 +9,7 @@ import { TemplatePicker } from './components/TemplatePicker';
 import { Trip, AISuggestion, BrokerProfile, DEFAULT_BROKER, TemplateId } from './types';
 import { extractTripData, getAISuggestions } from './services/geminiService';
 import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Settings, Layers } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toCanvas } from 'html-to-image';
 import jsPDF from 'jspdf';
 
 export type ProcessingStage = 'reading' | 'extracting' | 'enriching' | null;
@@ -205,58 +205,29 @@ export default function App() {
     setIsGeneratingPDF(true);
     setIsExportingPDF(true);
     try {
+      // Wait for exportMode re-render (SVG map swap) to commit to the DOM
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+
+      // html-to-image uses the browser's native SVG foreignObject renderer so it
+      // never needs to parse CSS itself — oklch, custom properties, Tailwind v4,
+      // all handled by the browser exactly as the user sees them on screen.
+      // The only thing we need to handle is cross-origin images (picsum fallback
+      // photos) which would taint the canvas; we exclude them via the filter fn.
+      const canvas = await toCanvas(element, {
+        pixelRatio: 2,
         backgroundColor: '#ffffff',
-        onclone: (doc) => {
-          // 1. Remove all stylesheets (prevents Tailwind oklch rules from being parsed)
-          doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => node.remove());
-
-          // 2. Strip oklch from every element's inline style attribute.
-          //    Vite + Tailwind v4 in dev mode injects CSS custom property declarations
-          //    containing oklch() directly as inline styles on <html> (e.g.
-          //    "--color-zinc-100: oklch(0.985 0.002 247.858)"). html2canvas parses
-          //    these with its own CSS parser, which doesn't understand oklch → throws.
-          doc.querySelectorAll('*').forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            if (htmlEl.style?.cssText?.includes('oklch')) {
-              htmlEl.style.cssText = htmlEl.style.cssText
-                .split(';')
-                .map((d) => d.trim())
-                .filter((d) => d && !d.includes('oklch'))
-                .join('; ');
-            }
-          });
-
-          // 3. Restore explicit width lost when Tailwind w-[760px] class is stripped
-          const pdfEl = doc.getElementById('pdf-content');
-          if (pdfEl) (pdfEl as HTMLElement).style.width = '760px';
-
-          // 4. Replace any external (non-data-URI) images with a neutral SVG placeholder.
-          //    picsum.photos and similar hosts lack CORS headers — without this they taint
-          //    the canvas, causing canvas.toDataURL() to throw a SecurityError.
-          const placeholder =
-            'data:image/svg+xml;base64,' +
-            btoa('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="100%" height="100%" fill="#f4f4f5"/></svg>');
-          doc.querySelectorAll('img').forEach((img) => {
-            if (!(img as HTMLImageElement).src.startsWith('data:')) {
-              (img as HTMLImageElement).src = placeholder;
-            }
-          });
-
-          // 5. Inject a minimal safe stylesheet for basic layout
-          const style = doc.createElement('style');
-          style.textContent = `
-            * { box-sizing: border-box; }
-            body { margin: 0; background: #fff; }
-            #pdf-content { font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif; }
-          `;
-          doc.head.appendChild(style);
+        // Exclude <img> elements whose src isn't a data-URI or same-origin URL.
+        // These are the picsum.photos placeholder aircraft photos — they have no
+        // CORS headers so they'd taint the canvas and break toDataURL().
+        filter: (node) => {
+          if (node instanceof HTMLImageElement) {
+            const src = node.src ?? '';
+            return src.startsWith('data:') || src.startsWith(window.location.origin);
+          }
+          return true;
         },
       });
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();

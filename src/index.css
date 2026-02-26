@@ -52,8 +52,19 @@
   position: absolute;
   inset: 0;
 }
-.jet {
+/* Wrapper handles absolute positioning + the one-shot fade-in on load */
+.jet-wrap {
   position: absolute;
+  width: 28px;
+  height: 28px;
+  opacity: 0;
+  animation: jet-appear 0.7s ease-out forwards;
+}
+@keyframes jet-appear {
+  to { opacity: 1; }
+}
+/* Jet sits at (0,0) inside its wrapper; transform animations move it from there */
+.jet {
   width: 28px;
   height: 28px;
   opacity: 0.6;

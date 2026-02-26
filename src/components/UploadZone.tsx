@@ -74,29 +74,39 @@ export function UploadZone({
       <div className="pointer-events-none absolute inset-0">
         <div className="jet-grid">
           {[
-            { dir: 'east',  style: { top: '6%',  left: '4%',  animationDelay: '0s' } },
-            { dir: 'west',  style: { top: '14%', left: '72%', animationDelay: '1.8s' } },
-            { dir: 'east',  style: { top: '8%',  left: '44%', animationDelay: '0.9s' } },
-            { dir: 'west',  style: { top: '26%', left: '16%', animationDelay: '2.6s' } },
-            { dir: 'east',  style: { top: '38%', left: '8%',  animationDelay: '1.2s' } },
-            { dir: 'west',  style: { top: '46%', left: '78%', animationDelay: '2.1s' } },
-            { dir: 'east',  style: { top: '56%', left: '50%', animationDelay: '0.4s' } },
-            { dir: 'west',  style: { top: '64%', left: '24%', animationDelay: '1.6s' } },
-            { dir: 'east',  style: { top: '72%', left: '12%', animationDelay: '0.7s' } },
-            { dir: 'west',  style: { top: '80%', left: '74%', animationDelay: '2.9s' } },
+            // animDelay: negative value puts each jet mid-flight from the very first frame
+            //            (no frozen-at-origin moment before the animation fires)
+            // fadeDelay: tiny staggered delay on the wrapper's jet-appear fade-in
+            { dir: 'east', top: '6%',  left: '4%',  animDelay: '-4s',  fadeDelay: '0s'     },
+            { dir: 'west', top: '14%', left: '72%', animDelay: '-7s',  fadeDelay: '0.12s'  },
+            { dir: 'east', top: '8%',  left: '44%', animDelay: '-2s',  fadeDelay: '0.06s'  },
+            { dir: 'west', top: '26%', left: '16%', animDelay: '-9s',  fadeDelay: '0.2s'   },
+            { dir: 'east', top: '38%', left: '8%',  animDelay: '-6s',  fadeDelay: '0.08s'  },
+            { dir: 'west', top: '46%', left: '78%', animDelay: '-3s',  fadeDelay: '0.16s'  },
+            { dir: 'east', top: '56%', left: '50%', animDelay: '-8s',  fadeDelay: '0.24s'  },
+            { dir: 'west', top: '64%', left: '24%', animDelay: '-5s',  fadeDelay: '0.04s'  },
+            { dir: 'east', top: '72%', left: '12%', animDelay: '-3s',  fadeDelay: '0.18s'  },
+            { dir: 'west', top: '80%', left: '74%', animDelay: '-10s', fadeDelay: '0.28s'  },
           ].map((jet, i) => {
             const longRun = i % 3 === 0;
             return (
-            <img
-              key={i}
-              className={`jet jet-${jet.dir} ${longRun ? 'jet-long' : 'jet-short'}`}
-              style={jet.style}
-              src="/jet.svg"
-              alt=""
-              aria-hidden="true"
-              loading="lazy"
-            />
-          );
+              // Wrapper: absolutely-positioned anchor + one-shot opacity fade-in
+              <div
+                key={i}
+                className="jet-wrap"
+                style={{ top: jet.top, left: jet.left, animationDelay: jet.fadeDelay }}
+              >
+                {/* Jet moves via transform from (0,0) of its wrapper */}
+                <img
+                  className={`jet jet-${jet.dir} ${longRun ? 'jet-long' : 'jet-short'}`}
+                  style={{ animationDelay: jet.animDelay }}
+                  src="/jet.svg"
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                />
+              </div>
+            );
           })}
         </div>
       </div>
