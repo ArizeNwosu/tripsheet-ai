@@ -142,8 +142,7 @@ export function ShareModal({ isOpen, onClose, trip, brokerProfile, template, use
                       {isCopied ? 'Copied!' : 'Copy Link'}
                     </button>
                     <p className="text-[10px] text-zinc-400 text-center leading-relaxed">
-                      Anyone with this link can view the trip sheet.
-                      Your logo image won't appear in the shared view.
+                      Anyone with this link can view the trip sheet. No login required.
                     </p>
                   </div>
                 )}

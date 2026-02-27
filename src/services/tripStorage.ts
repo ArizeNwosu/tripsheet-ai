@@ -1,8 +1,9 @@
-import { db } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
 import {
   collection, addDoc, getDocs, deleteDoc,
   doc, setDoc, getDoc, query, orderBy, Timestamp,
 } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Trip, BrokerProfile, TemplateId, StoredTrip } from '../types';
 
 function buildRoute(trip: Trip): string {
@@ -12,7 +13,26 @@ function buildRoute(trip: Trip): string {
   return `${first} → ${last}`;
 }
 
-// Strip base64 images before storing — Firestore has a 1MB document limit
+// Upload a base64 data URL to Firebase Storage and return the public download URL.
+// Returns undefined (non-fatal) if the upload fails or the data URL is absent.
+async function uploadImage(
+  shareId: string,
+  key: string,
+  dataUrl: string | undefined,
+): Promise<string | undefined> {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return undefined;
+  try {
+    const storageRef = ref(storage, `shared_trips/${shareId}/${key}`);
+    await uploadString(storageRef, dataUrl, 'data_url');
+    return await getDownloadURL(storageRef);
+  } catch (err) {
+    console.warn(`Image upload skipped for ${key}:`, err);
+    return undefined;
+  }
+}
+
+// Strip base64 images from a profile (used for Firestore history entries
+// where images aren't needed — the user's localStorage copy has them).
 function stripImages(profile: BrokerProfile): BrokerProfile {
   const { logo_dataurl, exterior_image_dataurl, interior_image_dataurl, ...rest } = profile;
   return rest;
@@ -64,9 +84,26 @@ export async function createShareLink(
   template: TemplateId,
 ): Promise<string> {
   const shareId = Math.random().toString(36).substr(2, 14);
+
+  // Upload base64 images to Firebase Storage in parallel.
+  // The returned HTTPS URLs replace the base64 strings in the stored profile —
+  // this keeps the Firestore document small while preserving the images.
+  const [logoUrl, exteriorUrl, interiorUrl] = await Promise.all([
+    uploadImage(shareId, 'logo', brokerProfile.logo_dataurl),
+    uploadImage(shareId, 'exterior', brokerProfile.exterior_image_dataurl),
+    uploadImage(shareId, 'interior', brokerProfile.interior_image_dataurl),
+  ]);
+
+  const storedProfile: BrokerProfile = {
+    ...stripImages(brokerProfile),
+    ...(logoUrl      && { logo_dataurl: logoUrl }),
+    ...(exteriorUrl  && { exterior_image_dataurl: exteriorUrl }),
+    ...(interiorUrl  && { interior_image_dataurl: interiorUrl }),
+  };
+
   await setDoc(doc(db, 'shared_trips', shareId), {
     trip,
-    brokerProfile: stripImages(brokerProfile),
+    brokerProfile: storedProfile,
     template,
     createdAt: Timestamp.now(),
     userId,
