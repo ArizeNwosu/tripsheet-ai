@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, ArrowRight, CheckCircle, FileUp, Settings, Layers } from 'lucide-react';
+import { FileText, ArrowRight, CheckCircle, FileUp, Settings, Layers, LogIn, LogOut } from 'lucide-react';
 import { ProcessingStage } from '../App';
 import { TemplateId } from '../types';
 import { TemplateThumb, TEMPLATES } from './TemplateThumbs';
@@ -18,6 +18,10 @@ interface UploadZoneProps {
   companyName: string;
   selectedTemplate: TemplateId;
   onSelectTemplate: (t: TemplateId) => void;
+  onSignIn: () => void;
+  userEmail?: string;
+  isDemoMode?: boolean;
+  onSignOut: () => void;
 }
 
 const STAGES: { key: ProcessingStage; label: string; sub: string }[] = [
@@ -43,6 +47,10 @@ export function UploadZone({
   companyName,
   selectedTemplate,
   onSelectTemplate,
+  onSignIn,
+  userEmail,
+  isDemoMode,
+  onSignOut,
 }: UploadZoneProps) {
   const [draggedFile, setDraggedFile] = useState<{ name: string; size: string } | null>(null);
 
@@ -134,10 +142,27 @@ export function UploadZone({
             <Settings className="w-3 h-3" />
             <span className="hidden sm:inline">Branding</span>
           </button>
-          <div className="hidden sm:block h-5 w-px bg-zinc-100" />
-          <span className="hidden sm:inline text-[11px] text-zinc-400 font-medium truncate max-w-[120px]">
-            {companyName}
-          </span>
+          <div className="h-5 w-px bg-zinc-100" />
+          {/* Auth */}
+          {isDemoMode && (
+            <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-wider">Demo</span>
+          )}
+          {userEmail ? (
+            <div className="flex items-center gap-1.5">
+              <span className="hidden sm:inline text-[10px] text-zinc-400 max-w-[100px] truncate">{userEmail}</span>
+              <button onClick={onSignOut} title="Sign out" className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors">
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onSignIn}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-white text-zinc-600 border border-zinc-200 hover:border-zinc-400 hover:text-zinc-900 transition-all"
+            >
+              <LogIn className="w-3 h-3" />
+              <span className="hidden sm:inline">Sign In</span>
+            </button>
+          )}
         </div>
       </div>
 

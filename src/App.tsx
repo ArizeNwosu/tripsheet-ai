@@ -356,6 +356,10 @@ export default function App() {
           companyName={brokerProfile.company_name}
           selectedTemplate={selectedTemplate}
           onSelectTemplate={setSelectedTemplate}
+          onSignIn={() => setIsAuthModalOpen(true)}
+          userEmail={user?.email ?? undefined}
+          isDemoMode={isDemoMode}
+          onSignOut={signOut}
         />
 
         <BrokerSettingsDrawer
@@ -465,12 +469,12 @@ export default function App() {
           <div className="h-4 w-px bg-zinc-100" />
 
           {/* Auth — always visible */}
+          {isDemoMode && (
+            <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-wider">Demo</span>
+          )}
           {user ? (
             <div className="flex items-center gap-1.5">
               <span className="hidden sm:inline text-[10px] text-zinc-400 max-w-[120px] truncate">{user.email}</span>
-              {isDemoMode && (
-                <span className="hidden sm:inline text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-wider">Demo</span>
-              )}
               <button
                 onClick={signOut}
                 title="Sign out"
