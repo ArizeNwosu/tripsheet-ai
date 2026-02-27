@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, ArrowRight, CheckCircle, FileUp, Settings, Layers, LogIn, LogOut } from 'lucide-react';
+import { FileText, ArrowRight, CheckCircle, Settings, Layers, LogIn, LogOut } from 'lucide-react';
 import { ProcessingStage } from '../App';
 import { TemplateId } from '../types';
 import { TemplateThumb, TEMPLATES } from './TemplateThumbs';
@@ -122,7 +122,7 @@ export function UploadZone({
       <div className="flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white/80 backdrop-blur-sm border-b border-zinc-100 relative z-10">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-zinc-900 rounded flex items-center justify-center flex-shrink-0">
-            <FileUp className="w-3.5 h-3.5 text-white" />
+            <img src="/jet-top-down.svg" className="w-3.5 h-3.5" style={{ filter: 'invert(1)' }} alt="" />
           </div>
           <span className="text-sm font-black tracking-widest text-zinc-900 uppercase">TripSheet AI</span>
           <span className="hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 text-zinc-500 rounded-full uppercase tracking-wider">Beta</span>
