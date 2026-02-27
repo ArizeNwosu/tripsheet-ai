@@ -335,6 +335,24 @@ export default function App() {
             backgroundColor: null,
             scale: 2,
             logging: false,
+            // Strip all stylesheets from the cloned document so html2canvas's
+            // CSS parser never encounters oklch() (Tailwind v4), which it
+            // doesn't support and throws on. Leaflet tile positions are set
+            // via inline styles, so the map renders correctly without them.
+            // We re-inject only the minimal class-based Leaflet layout rules.
+            onclone: (_clonedDoc: Document) => {
+              _clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(el => el.remove());
+              const s = _clonedDoc.createElement('style');
+              s.textContent = [
+                '.leaflet-container{overflow:hidden;position:relative}',
+                '.leaflet-pane,.leaflet-map-pane{position:absolute;top:0;left:0}',
+                '.leaflet-tile-pane{z-index:2}',
+                '.leaflet-overlay-pane{z-index:4;position:absolute;top:0;left:0}',
+                '.leaflet-marker-pane{z-index:6;position:absolute;top:0;left:0}',
+                '.leaflet-tile{border:0;padding:0;position:absolute}',
+              ].join('');
+              _clonedDoc.head.appendChild(s);
+            },
           });
           const img = document.createElement('img');
           img.src = mapCanvas.toDataURL('image/png');
