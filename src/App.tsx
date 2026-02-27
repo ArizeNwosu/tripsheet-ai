@@ -8,10 +8,12 @@ import { BrokerSettingsDrawer } from './components/BrokerSettingsDrawer';
 import { TemplatePicker } from './components/TemplatePicker';
 import { Trip, AISuggestion, BrokerProfile, DEFAULT_BROKER, TemplateId } from './types';
 import { extractTripData, getAISuggestions } from './services/geminiService';
-import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Settings, Layers } from 'lucide-react';
+import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Settings, Layers, LogIn, LogOut } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useAuth } from './contexts/AuthContext';
+import { AuthModal } from './components/AuthModal';
 
 export type ProcessingStage = 'reading' | 'extracting' | 'enriching' | null;
 
@@ -55,7 +57,10 @@ export default function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>(loadTemplate);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('preview');
+
+  const { user, isDemoMode, signOut } = useAuth();
 
   // Persist broker profile to localStorage whenever it changes
   useEffect(() => {
@@ -367,6 +372,8 @@ export default function App() {
           onClose={() => setIsTemplatePickerOpen(false)}
         />
 
+        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+
         {/* Toasts */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
           <AnimatePresence>
@@ -457,6 +464,33 @@ export default function App() {
 
           <div className="h-4 w-px bg-zinc-100" />
 
+          {/* Auth — always visible */}
+          {user ? (
+            <div className="flex items-center gap-1.5">
+              <span className="hidden sm:inline text-[10px] text-zinc-400 max-w-[120px] truncate">{user.email}</span>
+              {isDemoMode && (
+                <span className="hidden sm:inline text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-wider">Demo</span>
+              )}
+              <button
+                onClick={signOut}
+                title="Sign out"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-zinc-50 text-zinc-600 border border-zinc-100 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              <LogIn className="w-3 h-3" />
+              <span className="hidden sm:inline">Sign In</span>
+            </button>
+          )}
+
+          <div className="h-4 w-px bg-zinc-100" />
+
           {/* Export — always visible; label hidden on mobile */}
           <button
             onClick={downloadPDF}
@@ -528,6 +562,8 @@ export default function App() {
         onSelect={setSelectedTemplate}
         onClose={() => setIsTemplatePickerOpen(false)}
       />
+
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
       {/* Toasts */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
