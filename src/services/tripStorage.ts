@@ -12,10 +12,16 @@ function buildRoute(trip: Trip): string {
   return `${first} → ${last}`;
 }
 
-// Compress a base64 data URL to a smaller JPEG data URL using an offscreen canvas.
-// Images are resized so neither dimension exceeds maxPx, then encoded at the given quality.
-// Returns the original value unchanged if it isn't a data: URL (e.g. already an https URL).
-function compressImage(dataUrl: string, maxPx = 600, quality = 0.65): Promise<string> {
+// Compress a base64 data URL using an offscreen canvas.
+// Images are resized so neither dimension exceeds maxPx.
+// Use format='png' to preserve transparency (e.g. logos); 'jpeg' for photos.
+// Returns the original value unchanged if it isn't a data: URL.
+function compressImage(
+  dataUrl: string,
+  maxPx = 600,
+  quality = 0.65,
+  format: 'jpeg' | 'png' = 'jpeg',
+): Promise<string> {
   if (!dataUrl.startsWith('data:')) return Promise.resolve(dataUrl);
   return new Promise((resolve) => {
     const img = new Image();
@@ -24,8 +30,14 @@ function compressImage(dataUrl: string, maxPx = 600, quality = 0.65): Promise<st
       const canvas = document.createElement('canvas');
       canvas.width  = Math.round(img.width  * scale);
       canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      const ctx = canvas.getContext('2d')!;
+      if (format === 'jpeg') {
+        // Fill white so transparent areas don't become black
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL(`image/${format}`, format === 'jpeg' ? quality : undefined));
     };
     img.onerror = () => resolve(dataUrl); // non-fatal: keep original
     img.src = dataUrl;
@@ -83,9 +95,9 @@ export async function createShareLink(
   // Canvas resize + JPEG encoding keeps each image well under 200 KB,
   // so the whole document stays inside Firestore's 1 MB limit.
   const [logo, exterior, interior] = await Promise.all([
-    brokerProfile.logo_dataurl             ? compressImage(brokerProfile.logo_dataurl)             : Promise.resolve(undefined),
-    brokerProfile.exterior_image_dataurl   ? compressImage(brokerProfile.exterior_image_dataurl)   : Promise.resolve(undefined),
-    brokerProfile.interior_image_dataurl   ? compressImage(brokerProfile.interior_image_dataurl)   : Promise.resolve(undefined),
+    brokerProfile.logo_dataurl           ? compressImage(brokerProfile.logo_dataurl, 600, 0.65, 'png')   : Promise.resolve(undefined),
+    brokerProfile.exterior_image_dataurl ? compressImage(brokerProfile.exterior_image_dataurl)            : Promise.resolve(undefined),
+    brokerProfile.interior_image_dataurl ? compressImage(brokerProfile.interior_image_dataurl)            : Promise.resolve(undefined),
   ]);
 
   const storedProfile: BrokerProfile = {

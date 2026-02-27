@@ -178,10 +178,11 @@ export default function App() {
 
     const reader = new FileReader();
     reader.onload = async (e) => {
+      let extractedTrip: Trip | null = null;
       try {
         setProcessingStage('extracting');
         const base64 = e.target?.result as string;
-        const extractedTrip = await extractTripData(base64, file.type);
+        extractedTrip = await extractTripData(base64, file.type);
         setTrip(extractedTrip);
 
         // Auto-save to history for Pro users
@@ -190,24 +191,29 @@ export default function App() {
             .then(docId => setCurrentTripDocId(docId))
             .catch(err => console.error('Auto-save failed:', err));
         }
-
-        setProcessingStage('enriching');
-        const aiSuggestions = await getAISuggestions(extractedTrip);
-        setSuggestions(aiSuggestions);
-        if (aiSuggestions.length > 0) {
-          setIsAssistantOpen(true);
-        }
       } catch (error) {
         console.error('Extraction failed:', error);
         const msg = error instanceof Error ? error.message : String(error);
         addToast('error', `Extraction failed: ${msg}`);
       } finally {
+        // Show the trip (or error) as soon as extraction finishes —
+        // don't block on AI suggestions, which run in the background below.
         const elapsed = Date.now() - uploadStart;
         const delay = Math.max(0, MIN_ANIM_MS - elapsed);
         if (delay > 0) await new Promise(r => setTimeout(r, delay));
         setIsProcessing(false);
         setProcessingStage(null);
         setUploadedFileName('');
+      }
+
+      // Non-blocking: fetch AI suggestions after the spinner is gone.
+      if (extractedTrip) {
+        getAISuggestions(extractedTrip)
+          .then(aiSuggestions => {
+            setSuggestions(aiSuggestions);
+            if (aiSuggestions.length > 0) setIsAssistantOpen(true);
+          })
+          .catch(err => console.warn('AI suggestions (non-fatal):', err));
       }
     };
     reader.onerror = () => {
