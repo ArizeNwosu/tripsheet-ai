@@ -175,6 +175,7 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
       arrival: leg.arrival || { airport_code: '', airport_name: '', city: '', state: '', timezone: '', datetime_local: '' },
       metrics: leg.metrics || {}
     })),
+    passengers: rawData.passengers || [],
     crew: rawData.crew || [],
     visibility: {
       show_tail_number: true,
