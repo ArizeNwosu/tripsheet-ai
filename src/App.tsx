@@ -64,45 +64,52 @@ export default function App() {
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('preview');
 
-  const { user, isDemoMode, isSubscribed, exportCount, canExport, signOut, recordExport, refreshUserData } = useAuth();
+  const { user, isDemoMode, isSubscribed, exportCount, canExport, signOut, recordExport, refreshUserData, isAuthLoading } = useAuth();
 
-  // Handle Stripe checkout redirect
+  // ── Step 1: Detect checkout redirect on first mount, stash session ID ──
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get('checkout');
     const sessionId = params.get('session_id');
+    // Clean URL immediately regardless of outcome
+    if (checkout) window.history.replaceState({}, '', window.location.pathname);
 
     if (checkout === 'success' && sessionId) {
-      // Clean URL immediately
-      window.history.replaceState({}, '', window.location.pathname);
-
-      // Verify with Stripe and mark subscribed in Firestore
-      (async () => {
-        try {
-          const res = await fetch(`/api/verify-subscription?session_id=${sessionId}`);
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error);
-
-          // Verify the session belongs to the current user
-          if (user && data.userId === user.uid) {
-            await updateDoc(doc(db, 'users', user.uid), {
-              isSubscribed: true,
-              stripeCustomerId: data.customerId,
-            });
-            await refreshUserData();
-            addToast('success', 'You\'re now a Pro member. Unlimited exports unlocked!');
-          }
-        } catch (err) {
-          console.error('Subscription verification failed:', err);
-          addToast('error', 'Could not verify your subscription. Please contact support.');
-        }
-      })();
+      setPendingSessionId(sessionId);
     } else if (checkout === 'cancel') {
-      window.history.replaceState({}, '', window.location.pathname);
       addToast('error', 'Checkout cancelled — no charge made.');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, []);
+
+  // ── Step 2: Once auth has loaded and user is available, verify & activate ──
+  useEffect(() => {
+    if (!pendingSessionId || isAuthLoading || !user) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/verify-subscription?session_id=${pendingSessionId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        if (data.userId === user.uid) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            isSubscribed: true,
+            stripeCustomerId: data.customerId,
+          });
+          await refreshUserData();
+          addToast('success', "You're now a Pro member. Unlimited exports unlocked!");
+        }
+      } catch (err) {
+        console.error('Subscription verification failed:', err);
+        addToast('error', 'Could not verify your subscription. Please contact support.');
+      } finally {
+        setPendingSessionId(null);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSessionId, isAuthLoading, user]);
 
   // Persist broker profile to localStorage whenever it changes
   useEffect(() => {
