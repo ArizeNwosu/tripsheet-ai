@@ -78,6 +78,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
+  // ── Verify subscription status against Stripe ────────────────────────────
+  // Called on initial load and refresh. If Stripe says the subscription is
+  // no longer active we sync Firestore and local state immediately so
+  // cancellations are reflected without a webhook.
+  async function resolveSubscription(
+    data: Record<string, any>,
+    userRef: ReturnType<typeof doc>,
+  ): Promise<boolean> {
+    const firestoreSubscribed: boolean = data.isSubscribed ?? false;
+    const stripeCustomerId: string | undefined = data.stripeCustomerId;
+
+    if (firestoreSubscribed && stripeCustomerId) {
+      try {
+        const res = await fetch(`/api/check-subscription?customer_id=${stripeCustomerId}`);
+        const json = await res.json();
+        const isActive: boolean = json.isActive ?? false;
+        if (!isActive) {
+          // Subscription was cancelled — sync Firestore
+          await updateDoc(userRef, { isSubscribed: false });
+        }
+        return isActive;
+      } catch {
+        // Stripe unreachable — trust Firestore
+        return firestoreSubscribed;
+      }
+    }
+    return firestoreSubscribed;
+  }
+
   // ── Load / create Firestore user doc when user changes ───────────────────
   useEffect(() => {
     if (!user) {
@@ -87,23 +116,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const userRef = doc(db, 'users', user.uid);
-    getDoc(userRef).then(snap => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setExportCount(data.exportCount ?? 0);
-        setIsSubscribed(data.isSubscribed ?? false);
-      } else {
-        // First time — create the user document
-        setDoc(userRef, {
-          email: user.email,
-          createdAt: new Date(),
-          exportCount: 0,
-          isSubscribed: false,
-        });
-        setExportCount(0);
-        setIsSubscribed(false);
+    (async () => {
+      try {
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          setExportCount(data.exportCount ?? 0);
+          setIsSubscribed(await resolveSubscription(data, userRef));
+        } else {
+          // First time — create the user document
+          await setDoc(userRef, {
+            email: user.email,
+            createdAt: new Date(),
+            exportCount: 0,
+            isSubscribed: false,
+          });
+          setExportCount(0);
+          setIsSubscribed(false);
+        }
+      } catch (err) {
+        console.error('Failed to load user data:', err);
       }
-    }).catch(err => console.error('Failed to load user data:', err));
+    })();
   }, [user]);
 
   const canExport = isDemoMode || isSubscribed || exportCount < FREE_EXPORT_LIMIT;
@@ -135,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (snap.exists()) {
       const data = snap.data();
       setExportCount(data.exportCount ?? 0);
-      setIsSubscribed(data.isSubscribed ?? false);
+      setIsSubscribed(await resolveSubscription(data, userRef));
     }
   };
 
