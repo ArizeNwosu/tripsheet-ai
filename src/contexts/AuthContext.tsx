@@ -7,7 +7,10 @@ import {
   signOut as firebaseSignOut,
   User,
 } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
+
+export const FREE_EXPORT_LIMIT = 3;
 
 const DEMO_TOKEN = import.meta.env.VITE_DEMO_TOKEN;
 const DEMO_KEY = 'tripsheet_demo_mode';
@@ -17,8 +20,12 @@ interface AuthContextValue {
   user: User | null;
   isDemoMode: boolean;
   isAuthLoading: boolean;
+  exportCount: number;
+  isSubscribed: boolean;
+  canExport: boolean;
   sendMagicLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
+  recordExport: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,14 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [exportCount, setExportCount] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
+  // ── Demo token check ──────────────────────────────────────────────────────
   useEffect(() => {
-    // ── 1. Check for demo token in URL ─────────────────────────────────────
     const params = new URLSearchParams(window.location.search);
     const demoParam = params.get('demo');
     if (demoParam && demoParam === DEMO_TOKEN) {
       localStorage.setItem(DEMO_KEY, 'true');
-      // Strip the param from the URL without reloading
       params.delete('demo');
       const newUrl = params.toString()
         ? `${window.location.pathname}?${params.toString()}`
@@ -45,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsDemoMode(true);
     }
 
-    // ── 2. Complete magic link sign-in if this is a link redirect ──────────
+    // Complete magic link sign-in if redirected back
     if (isSignInWithEmailLink(auth, window.location.href)) {
       let email = localStorage.getItem(EMAIL_KEY);
       if (!email) {
@@ -55,20 +63,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithEmailLink(auth, email, window.location.href)
           .then(() => {
             localStorage.removeItem(EMAIL_KEY);
-            // Strip Firebase query params from URL
             window.history.replaceState({}, '', window.location.pathname);
           })
           .catch(err => console.error('Magic link sign-in failed:', err));
       }
     }
 
-    // ── 3. Listen to auth state ─────────────────────────────────────────────
+    // Auth state listener
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setIsAuthLoading(false);
     });
     return unsub;
   }, []);
+
+  // ── Load / create Firestore user doc when user changes ───────────────────
+  useEffect(() => {
+    if (!user) {
+      setExportCount(0);
+      setIsSubscribed(false);
+      return;
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    getDoc(userRef).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setExportCount(data.exportCount ?? 0);
+        setIsSubscribed(data.isSubscribed ?? false);
+      } else {
+        // First time — create the user document
+        setDoc(userRef, {
+          email: user.email,
+          createdAt: new Date(),
+          exportCount: 0,
+          isSubscribed: false,
+        });
+        setExportCount(0);
+        setIsSubscribed(false);
+      }
+    }).catch(err => console.error('Failed to load user data:', err));
+  }, [user]);
+
+  const canExport = isDemoMode || isSubscribed || exportCount < FREE_EXPORT_LIMIT;
 
   const sendMagicLink = async (email: string) => {
     const actionCodeSettings = {
@@ -83,8 +120,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
   };
 
+  const recordExport = async () => {
+    if (!user || isDemoMode || isSubscribed) return;
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, { exportCount: increment(1) });
+    setExportCount(prev => prev + 1);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isDemoMode, isAuthLoading, sendMagicLink, signOut }}>
+    <AuthContext.Provider value={{
+      user,
+      isDemoMode,
+      isAuthLoading,
+      exportCount,
+      isSubscribed,
+      canExport,
+      sendMagicLink,
+      signOut,
+      recordExport,
+    }}>
       {children}
     </AuthContext.Provider>
   );

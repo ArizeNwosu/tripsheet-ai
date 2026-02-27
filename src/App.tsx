@@ -12,8 +12,9 @@ import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Se
 import { toCanvas } from 'html-to-image';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth, FREE_EXPORT_LIMIT } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
+import { PaywallModal } from './components/PaywallModal';
 
 export type ProcessingStage = 'reading' | 'extracting' | 'enriching' | null;
 
@@ -58,9 +59,10 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('preview');
 
-  const { user, isDemoMode, signOut } = useAuth();
+  const { user, isDemoMode, isSubscribed, exportCount, canExport, signOut, recordExport } = useAuth();
 
   // Persist broker profile to localStorage whenever it changes
   useEffect(() => {
@@ -208,6 +210,17 @@ export default function App() {
   };
 
   const downloadPDF = async () => {
+    // Gate: must be signed in
+    if (!user && !isDemoMode) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    // Gate: must have exports remaining or be subscribed / demo
+    if (!canExport) {
+      setIsPaywallOpen(true);
+      return;
+    }
+
     const element = document.getElementById('pdf-content');
     if (!element) return;
     setIsGeneratingPDF(true);
@@ -291,7 +304,13 @@ export default function App() {
         }
       }
       pdf.save(`TripSheet-${trip?.trip_id?.toUpperCase() || 'export'}.pdf`);
-      addToast('success', 'PDF downloaded successfully.');
+      await recordExport();
+      const exportsLeft = FREE_EXPORT_LIMIT - (exportCount + 1);
+      if (!isDemoMode && !isSubscribed && exportsLeft > 0) {
+        addToast('success', `PDF downloaded. ${exportsLeft} free export${exportsLeft !== 1 ? 's' : ''} remaining.`);
+      } else {
+        addToast('success', 'PDF downloaded successfully.');
+      }
     } catch (error) {
       console.error('PDF generation failed:', error);
       addToast('error', 'Failed to generate PDF. Please try again.');
@@ -377,6 +396,7 @@ export default function App() {
         />
 
         <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+        <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} onUpgrade={() => setIsPaywallOpen(false)} />
 
         {/* Toasts */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
@@ -495,6 +515,17 @@ export default function App() {
 
           <div className="h-4 w-px bg-zinc-100" />
 
+          {/* Free export usage pill — shown for signed-in free users only */}
+          {user && !isSubscribed && !isDemoMode && (
+            <span className={`hidden sm:inline text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              exportCount >= FREE_EXPORT_LIMIT
+                ? 'text-red-500 bg-red-50 border-red-200'
+                : 'text-zinc-400 bg-zinc-50 border-zinc-200'
+            }`}>
+              {Math.max(0, FREE_EXPORT_LIMIT - exportCount)}/{FREE_EXPORT_LIMIT} free
+            </span>
+          )}
+
           {/* Export — always visible; label hidden on mobile */}
           <button
             onClick={downloadPDF}
@@ -568,6 +599,7 @@ export default function App() {
       />
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} onUpgrade={() => setIsPaywallOpen(false)} />
 
       {/* Toasts */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
