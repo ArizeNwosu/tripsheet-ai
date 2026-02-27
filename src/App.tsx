@@ -325,7 +325,7 @@ export default function App() {
         try {
           const mapCanvas = await html2canvas(container, {
             useCORS: true,
-            allowTaint: false,
+            allowTaint: true,
             backgroundColor: null,
             scale: 2,
             logging: false,
@@ -348,15 +348,6 @@ export default function App() {
       const canvas = await toCanvas(element, {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
-        filter: (node) => {
-          if (node instanceof HTMLImageElement) {
-            const src = node.src ?? '';
-            if (src.startsWith('data:') || src.startsWith(window.location.origin) || src.startsWith('/')) return true;
-            if (node.crossOrigin === 'anonymous') return true;
-            return false;
-          }
-          return true;
-        },
       });
 
       // ── Step 3: Restore Leaflet containers ───────────────────────────────────

@@ -1,9 +1,8 @@
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import {
   collection, addDoc, getDocs, deleteDoc,
   doc, setDoc, getDoc, query, orderBy, Timestamp,
 } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Trip, BrokerProfile, TemplateId, StoredTrip } from '../types';
 
 function buildRoute(trip: Trip): string {
@@ -13,29 +12,24 @@ function buildRoute(trip: Trip): string {
   return `${first} → ${last}`;
 }
 
-// Upload a base64 data URL to Firebase Storage and return the public download URL.
-// Returns undefined (non-fatal) if the upload fails or the data URL is absent.
-async function uploadImage(
-  shareId: string,
-  key: string,
-  dataUrl: string | undefined,
-): Promise<string | undefined> {
-  if (!dataUrl || !dataUrl.startsWith('data:')) return undefined;
-  try {
-    const storageRef = ref(storage, `shared_trips/${shareId}/${key}`);
-    await uploadString(storageRef, dataUrl, 'data_url');
-    return await getDownloadURL(storageRef);
-  } catch (err) {
-    console.warn(`Image upload skipped for ${key}:`, err);
-    return undefined;
-  }
-}
-
-// Strip base64 images from a profile (used for Firestore history entries
-// where images aren't needed — the user's localStorage copy has them).
-function stripImages(profile: BrokerProfile): BrokerProfile {
-  const { logo_dataurl, exterior_image_dataurl, interior_image_dataurl, ...rest } = profile;
-  return rest;
+// Compress a base64 data URL to a smaller JPEG data URL using an offscreen canvas.
+// Images are resized so neither dimension exceeds maxPx, then encoded at the given quality.
+// Returns the original value unchanged if it isn't a data: URL (e.g. already an https URL).
+function compressImage(dataUrl: string, maxPx = 600, quality = 0.65): Promise<string> {
+  if (!dataUrl.startsWith('data:')) return Promise.resolve(dataUrl);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // non-fatal: keep original
+    img.src = dataUrl;
+  });
 }
 
 export async function saveTrip(
@@ -85,20 +79,20 @@ export async function createShareLink(
 ): Promise<string> {
   const shareId = Math.random().toString(36).substr(2, 14);
 
-  // Upload base64 images to Firebase Storage in parallel.
-  // The returned HTTPS URLs replace the base64 strings in the stored profile —
-  // this keeps the Firestore document small while preserving the images.
-  const [logoUrl, exteriorUrl, interiorUrl] = await Promise.all([
-    uploadImage(shareId, 'logo', brokerProfile.logo_dataurl),
-    uploadImage(shareId, 'exterior', brokerProfile.exterior_image_dataurl),
-    uploadImage(shareId, 'interior', brokerProfile.interior_image_dataurl),
+  // Compress images client-side before writing to Firestore.
+  // Canvas resize + JPEG encoding keeps each image well under 200 KB,
+  // so the whole document stays inside Firestore's 1 MB limit.
+  const [logo, exterior, interior] = await Promise.all([
+    brokerProfile.logo_dataurl             ? compressImage(brokerProfile.logo_dataurl)             : Promise.resolve(undefined),
+    brokerProfile.exterior_image_dataurl   ? compressImage(brokerProfile.exterior_image_dataurl)   : Promise.resolve(undefined),
+    brokerProfile.interior_image_dataurl   ? compressImage(brokerProfile.interior_image_dataurl)   : Promise.resolve(undefined),
   ]);
 
   const storedProfile: BrokerProfile = {
-    ...stripImages(brokerProfile),
-    ...(logoUrl      && { logo_dataurl: logoUrl }),
-    ...(exteriorUrl  && { exterior_image_dataurl: exteriorUrl }),
-    ...(interiorUrl  && { interior_image_dataurl: interiorUrl }),
+    ...brokerProfile,
+    ...(logo     !== undefined && { logo_dataurl:             logo }),
+    ...(exterior !== undefined && { exterior_image_dataurl:   exterior }),
+    ...(interior !== undefined && { interior_image_dataurl:   interior }),
   };
 
   await setDoc(doc(db, 'shared_trips', shareId), {
