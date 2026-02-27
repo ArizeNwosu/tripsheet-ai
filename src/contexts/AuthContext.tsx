@@ -26,6 +26,7 @@ interface AuthContextValue {
   sendMagicLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   recordExport: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -127,6 +128,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setExportCount(prev => prev + 1);
   };
 
+  const refreshUserData = async () => {
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      setExportCount(data.exportCount ?? 0);
+      setIsSubscribed(data.isSubscribed ?? false);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -138,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sendMagicLink,
       signOut,
       recordExport,
+      refreshUserData,
     }}>
       {children}
     </AuthContext.Provider>

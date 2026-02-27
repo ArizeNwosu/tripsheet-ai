@@ -15,6 +15,8 @@ import jsPDF from 'jspdf';
 import { useAuth, FREE_EXPORT_LIMIT } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { PaywallModal } from './components/PaywallModal';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
 export type ProcessingStage = 'reading' | 'extracting' | 'enriching' | null;
 
@@ -62,7 +64,45 @@ export default function App() {
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('preview');
 
-  const { user, isDemoMode, isSubscribed, exportCount, canExport, signOut, recordExport } = useAuth();
+  const { user, isDemoMode, isSubscribed, exportCount, canExport, signOut, recordExport, refreshUserData } = useAuth();
+
+  // Handle Stripe checkout redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get('checkout');
+    const sessionId = params.get('session_id');
+
+    if (checkout === 'success' && sessionId) {
+      // Clean URL immediately
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // Verify with Stripe and mark subscribed in Firestore
+      (async () => {
+        try {
+          const res = await fetch(`/api/verify-subscription?session_id=${sessionId}`);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+
+          // Verify the session belongs to the current user
+          if (user && data.userId === user.uid) {
+            await updateDoc(doc(db, 'users', user.uid), {
+              isSubscribed: true,
+              stripeCustomerId: data.customerId,
+            });
+            await refreshUserData();
+            addToast('success', 'You\'re now a Pro member. Unlimited exports unlocked!');
+          }
+        } catch (err) {
+          console.error('Subscription verification failed:', err);
+          addToast('error', 'Could not verify your subscription. Please contact support.');
+        }
+      })();
+    } else if (checkout === 'cancel') {
+      window.history.replaceState({}, '', window.location.pathname);
+      addToast('error', 'Checkout cancelled — no charge made.');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Persist broker profile to localStorage whenever it changes
   useEffect(() => {
@@ -396,7 +436,7 @@ export default function App() {
         />
 
         <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
-        <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} onUpgrade={() => setIsPaywallOpen(false)} />
+        <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} />
 
         {/* Toasts */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
@@ -599,7 +639,7 @@ export default function App() {
       />
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
-      <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} onUpgrade={() => setIsPaywallOpen(false)} />
+      <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} />
 
       {/* Toasts */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">

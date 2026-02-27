@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Zap, Check } from 'lucide-react';
+import { X, Zap, Check, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onUpgrade: () => void;
 }
 
 const PRO_FEATURES = [
@@ -16,7 +16,30 @@ const PRO_FEATURES = [
   'Priority AI extraction',
 ];
 
-export function PaywallModal({ isOpen, onClose, onUpgrade }: Props) {
+export function PaywallModal({ isOpen, onClose }: Props) {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleUpgrade = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, userEmail: user.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
+      window.location.href = data.url;
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -71,12 +94,14 @@ export function PaywallModal({ isOpen, onClose, onUpgrade }: Props) {
                   <span className="text-3xl font-black text-zinc-900">$29</span>
                   <span className="text-sm text-zinc-400">/ month</span>
                 </div>
+                {error && <p className="text-xs text-red-500">{error}</p>}
                 <button
-                  onClick={onUpgrade}
-                  className="w-full py-3 bg-zinc-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"
+                  onClick={handleUpgrade}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-zinc-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <Zap className="w-3.5 h-3.5" />
-                  Upgrade Now
+                  {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                  {isLoading ? 'Redirecting to checkout…' : 'Upgrade Now'}
                 </button>
                 <button
                   onClick={onClose}
