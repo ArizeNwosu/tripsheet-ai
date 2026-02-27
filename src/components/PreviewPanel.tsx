@@ -273,7 +273,7 @@ function ClassicTemplate({ trip, broker, exportMode = false }: { trip: Trip; bro
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', height: 200 }}>
           <div style={{ borderRight: '1px solid #e4e4e7', overflow: 'hidden' }}>
-            <RouteMap legs={mapLegs} height={200} exportMode={exportMode} mapStyle={broker.map_style?.classic} />
+            <RouteMap legs={mapLegs} height={200} exportMode={exportMode} mapStyle={exportMode ? 'svg' : (broker.map_style?.classic || 'leaflet')} />
           </div>
           <div style={{ borderRight: '1px solid #e4e4e7', overflow: 'hidden', position: 'relative', background: '#e4e4e7' }}>
             <img src={exteriorImage} alt="Aircraft exterior"
@@ -658,7 +658,7 @@ function PremiumTemplate({ trip, broker, exportMode = false }: { trip: Trip; bro
           <span style={{ fontSize: 7.5, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.16em' }}>Route Map</span>
           <span style={{ fontSize: 8, color: '#3f3f46' }}>{routeString}</span>
         </div>
-        <RouteMap legs={mapLegs} height={160} exportMode={exportMode} mapStyle={broker.map_style?.premium} />
+        <RouteMap legs={mapLegs} height={160} exportMode={exportMode} mapStyle={exportMode ? 'svg' : (broker.map_style?.premium || 'leaflet')} />
       </div>
 
       {/* Crew + Passengers */}
