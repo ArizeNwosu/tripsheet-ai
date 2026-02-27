@@ -32,13 +32,13 @@ function fillDefaults(trip: Trip): Trip {
   return {
     ...trip,
     client: {
-      ...trip.client,
-      name: safe(trip.client.name),
+      ...(trip.client || {}),
+      name: safe(trip.client?.name),
     },
     aircraft: {
-      ...trip.aircraft,
-      model: safe(trip.aircraft.model),
-      tail_number: safe(trip.aircraft.tail_number),
+      ...(trip.aircraft || {}),
+      model: safe(trip.aircraft?.model),
+      tail_number: safe(trip.aircraft?.tail_number),
     },
     legs: trip.legs.map((leg) => ({
       ...leg,
@@ -165,6 +165,8 @@ export async function extractTripData(fileData: string, mimeType: string): Promi
   const withDefaults = {
     ...rawData,
     trip_id: rawData.trip_id || Math.random().toString(36).substr(2, 9).toUpperCase(),
+    client: rawData.client || {},
+    aircraft: rawData.aircraft || {},
     legs: (rawData.legs || []).map((leg: any, index: number) => ({
       ...leg,
       leg_id: `leg-${index}`,
