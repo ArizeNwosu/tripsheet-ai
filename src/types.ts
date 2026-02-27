@@ -213,6 +213,16 @@ export interface BrokerProfile {
 
 export type TemplateId = 'classic' | 'executive' | 'premium';
 
+export interface StoredTrip {
+  id: string;          // Firestore doc ID
+  tripId: string;      // Trip reference number
+  clientName: string;
+  route: string;       // e.g. "KLAX → KTEB"
+  trip: Trip;
+  template: TemplateId;
+  createdAt: Date;
+}
+
 export const DEFAULT_BROKER: BrokerProfile = {
   company_name: '24|7 Jet',
   tagline: 'Private Charter',

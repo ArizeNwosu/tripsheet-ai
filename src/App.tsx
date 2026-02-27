@@ -8,15 +8,18 @@ import { BrokerSettingsDrawer } from './components/BrokerSettingsDrawer';
 import { TemplatePicker } from './components/TemplatePicker';
 import { Trip, AISuggestion, BrokerProfile, DEFAULT_BROKER, TemplateId } from './types';
 import { extractTripData, getAISuggestions } from './services/geminiService';
-import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Settings, Layers, LogIn, LogOut } from 'lucide-react';
+import { Sparkles, Download, ArrowLeft, Loader2, AlertCircle, X, CheckCircle, Settings, Layers, LogIn, LogOut, History, Share2 } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useAuth, FREE_EXPORT_LIMIT } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { PaywallModal } from './components/PaywallModal';
+import { TripHistoryDrawer } from './components/TripHistoryDrawer';
+import { ShareModal } from './components/ShareModal';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from './lib/firebase';
+import { saveTrip, loadSharedTrip } from './services/tripStorage';
 
 export type ProcessingStage = 'reading' | 'extracting' | 'enriching' | null;
 
@@ -62,6 +65,11 @@ export default function App() {
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [currentTripDocId, setCurrentTripDocId] = useState<string | null>(null);
+  const [sharedTripData, setSharedTripData] = useState<{ trip: Trip; brokerProfile: BrokerProfile; template: TemplateId } | null>(null);
+  const [isLoadingShare, setIsLoadingShare] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('preview');
 
   const { user, isDemoMode, isSubscribed, exportCount, canExport, signOut, recordExport, refreshUserData, isAuthLoading } = useAuth();
@@ -111,6 +119,23 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingSessionId, isAuthLoading, user]);
 
+  // ── Detect ?share= param on mount and load shared trip ──────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    if (!shareId) return;
+    window.history.replaceState({}, '', window.location.pathname);
+    setIsLoadingShare(true);
+    loadSharedTrip(shareId)
+      .then(data => {
+        if (data) setSharedTripData(data);
+        else addToast('error', 'Trip not found or the link has expired.');
+      })
+      .catch(() => addToast('error', 'Could not load shared trip.'))
+      .finally(() => setIsLoadingShare(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Persist broker profile to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -158,6 +183,13 @@ export default function App() {
         const base64 = e.target?.result as string;
         const extractedTrip = await extractTripData(base64, file.type);
         setTrip(extractedTrip);
+
+        // Auto-save to history for Pro users
+        if ((isSubscribed || isDemoMode) && user) {
+          saveTrip(user.uid, extractedTrip, selectedTemplate)
+            .then(docId => setCurrentTripDocId(docId))
+            .catch(err => console.error('Auto-save failed:', err));
+        }
 
         setProcessingStage('enriching');
         const aiSuggestions = await getAISuggestions(extractedTrip);
@@ -407,6 +439,33 @@ export default function App() {
     premium: 'Premium',
   };
 
+  if (isLoadingShare) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-zinc-50">
+        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (sharedTripData) {
+    return (
+      <div className="h-screen flex flex-col bg-zinc-100 overflow-hidden">
+        <div className="h-12 bg-white border-b border-zinc-100 flex items-center justify-between px-5 flex-shrink-0">
+          <span className="text-xs font-black tracking-widest text-zinc-900 uppercase">TripSheet</span>
+          <span className="text-[10px] text-zinc-400">Shared trip sheet · Read only</span>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <PreviewPanel
+            trip={sharedTripData.trip}
+            brokerProfile={sharedTripData.brokerProfile}
+            templateId={sharedTripData.template}
+            exportMode={false}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (!trip) {
     return (
       <>
@@ -445,6 +504,31 @@ export default function App() {
         <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
         <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} />
 
+        <TripHistoryDrawer
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          userId={user?.uid ?? null}
+          isPro={isSubscribed || isDemoMode}
+          onOpenTrip={(t, tmpl, docId) => {
+            setTrip(t);
+            setSelectedTemplate(tmpl);
+            setCurrentTripDocId(docId);
+            setSuggestions([]);
+          }}
+          onUpgrade={() => { setIsHistoryOpen(false); setIsPaywallOpen(true); }}
+        />
+
+        {/* Past Trips button — shown on upload screen for Pro users */}
+        {(isSubscribed || isDemoMode) && user && (
+          <button
+            onClick={() => setIsHistoryOpen(true)}
+            className="fixed bottom-6 left-6 flex items-center gap-2 px-4 py-2.5 bg-zinc-900/90 backdrop-blur text-white text-xs font-bold rounded-xl shadow-lg hover:bg-zinc-800 transition-colors z-10"
+          >
+            <History className="w-3.5 h-3.5" />
+            Past Trips
+          </button>
+        )}
+
         {/* Toasts */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
           <AnimatePresence>
@@ -478,7 +562,7 @@ export default function App() {
         {/* Left — back button + trip breadcrumb (collapses on mobile) */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
-            onClick={() => { setTrip(null); setSuggestions([]); }}
+            onClick={() => { setTrip(null); setSuggestions([]); setCurrentTripDocId(null); }}
             className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-400 hover:text-zinc-700 flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -522,6 +606,28 @@ export default function App() {
           >
             <Layers className="w-3 h-3" />
             {TEMPLATE_LABELS[selectedTemplate]}
+          </button>
+
+          {/* History — Pro only, hidden on mobile */}
+          <button
+            onClick={() => (isSubscribed || isDemoMode) ? setIsHistoryOpen(true) : setIsPaywallOpen(true)}
+            title="Trip History"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-zinc-50 text-zinc-600 border border-zinc-100 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+          >
+            <History className="w-3 h-3" />
+            History
+            {!(isSubscribed || isDemoMode) && <span className="text-[8px] text-amber-500 font-black">PRO</span>}
+          </button>
+
+          {/* Share — Pro only, hidden on mobile */}
+          <button
+            onClick={() => (isSubscribed || isDemoMode) ? setIsShareOpen(true) : setIsPaywallOpen(true)}
+            title="Share trip sheet"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-zinc-50 text-zinc-600 border border-zinc-100 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+          >
+            <Share2 className="w-3 h-3" />
+            Share
+            {!(isSubscribed || isDemoMode) && <span className="text-[8px] text-amber-500 font-black">PRO</span>}
           </button>
 
           {/* Broker settings — always visible */}
@@ -647,6 +753,31 @@ export default function App() {
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} />
+
+      <TripHistoryDrawer
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        userId={user?.uid ?? null}
+        isPro={isSubscribed || isDemoMode}
+        onOpenTrip={(t, tmpl, docId) => {
+          setTrip(t);
+          setSelectedTemplate(tmpl);
+          setCurrentTripDocId(docId);
+          setSuggestions([]);
+        }}
+        onUpgrade={() => { setIsHistoryOpen(false); setIsPaywallOpen(true); }}
+      />
+
+      <ShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        trip={trip}
+        brokerProfile={brokerProfile}
+        template={selectedTemplate}
+        userId={user?.uid ?? null}
+        isPro={isSubscribed || isDemoMode}
+        onUpgrade={() => { setIsShareOpen(false); setIsPaywallOpen(true); }}
+      />
 
       {/* Toasts */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none">
